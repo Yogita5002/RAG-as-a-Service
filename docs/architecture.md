@@ -1,35 +1,54 @@
-# Architecture
+# RAG as a Service — Architecture
 
-## Ingestion Flow
+## Overview
 
-Client
-→ FastAPI
-→ S3
-→ SQS
-→ Lambda Worker
-→ Chunking
-→ Embeddings
-→ PostgreSQL + pgvector
+RAG as a Service is a multi-tenant Retrieval-Augmented Generation platform that allows organizations to upload documents and ask natural-language questions about their content.
 
-## Query Flow
+The platform uses asynchronous document ingestion and synchronous RAG query processing.
 
-Client
-→ FastAPI
-→ Tenant Authentication
-→ Query Embedding
-→ PostgreSQL + pgvector
-→ Top-K Retrieval
-→ Prompt Construction
-→ LLM
-→ Answer + Source Citations
+---
 
-## Core Principles
+## High-Level Architecture
 
-- Multi-tenancy
-- Tenant data isolation
-- Asynchronous processing
-- Cloud-native deployment
-- Infrastructure as Code
-- CI/CD
-- Monitoring
-- Automated retrieval evaluation
+```text
+Users / Tenants
+       |
+       v
+React + Vite Frontend
+       |
+       v
+Amazon API Gateway
+       |
+       v
+FastAPI Backend
+       |
+       +--------------------+
+       |                    |
+       v                    v
+Document Ingestion       Query / RAG Flow
+       |                    |
+       v                    v
+     Amazon S3          Authentication
+       |                    |
+       v                    v
+    Amazon SQS         Query Embedding
+       |                    |
+       v                    v
+   AWS Lambda          OpenSearch
+       |                    |
+       v                    v
+Text Extraction         Top-K Retrieval
+Chunking                    |
+Embeddings                  v
+       |              Prompt Construction
+       v                    |
+Amazon OpenSearch           v
+       |              Amazon Bedrock LLM
+       |                    |
+       +--------------------+
+                            |
+                            v
+                  Answer + Source Citations
+                            |
+                            v
+                       React Frontend
