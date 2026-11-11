@@ -38,9 +38,20 @@ def get_connection() -> Iterator[psycopg.Connection]:
 
 def init_db() -> None:
     """Create extension and tables. Replace this function with migrations later."""
-    dimension = get_settings().embedding_dimension
+    settings = get_settings()
+    dimension = settings.embedding_dimension
+    if not settings.database_url:
+        raise DatabaseError("DATABASE_URL is not configured")
+
+    # The vector type must exist before register_vector() runs in get_connection(),
+    # so create the extension on a plain connection first.
+    try:
+        with psycopg.connect(settings.database_url, autocommit=True) as conn:
+            conn.execute("CREATE EXTENSION IF NOT EXISTS vector")
+    except psycopg.Error as exc:
+        raise DatabaseError(f"Could not create pgvector extension: {exc}") from exc
+
     with get_connection() as conn:
-        conn.execute("CREATE EXTENSION IF NOT EXISTS vector")
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS documents (
@@ -165,10 +176,10 @@ def search_chunks(query_embedding: list[float], top_k: int) -> list[dict[str, An
                 c.chunk_index,
                 c.content,
                 d.filename,
-                1 - (c.embedding <=> %s) AS score
+                1 - (c.embedding <=> %s::vector) AS score
             FROM chunks c
             JOIN documents d ON d.id = c.document_id
-            ORDER BY c.embedding <=> %s
+            ORDER BY c.embedding <=> %s::vector
             LIMIT %s
             """,
             (query_embedding, query_embedding, top_k),
